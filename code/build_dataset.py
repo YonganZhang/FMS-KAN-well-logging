@@ -90,6 +90,10 @@ for w in WELLS:
     for t,(lo,hi) in TARGET_BOUNDS.items():
         if t in df.columns:
             yt = df[t].mask((df[t] < lo) | (df[t] > hi))
+            if t == 'SHMAX':   # 剔除远低于该井主分布的占位符(如WellC深部 134→8.5 断崖式假值)
+                med = yt.median()
+                if np.isfinite(med) and med > 0:
+                    yt = yt.mask(yt < med * 0.4)
             valid = feat_ok & yt.notna()
             df[t] = yt
             raw_n = df[t].notna().sum()

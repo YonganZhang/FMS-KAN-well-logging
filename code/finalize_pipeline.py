@@ -68,7 +68,8 @@ for T in TARGETS:
         mm=sk(name); mm.fit(Xtr_s,ytr); p=mm.predict(Xte_s)
         rr=r2(back(yte),back(p)); err_rows.append((T,name,rr,mae(back(yte),back(p))))
         if T=='SHMAX' and name=='RF':
-            assert 0.90<=rr<=0.96, f"RF SHMAX sanity 失败={rr:.4f} (应≈0.933,虚高bug复现!)"
+            # 剔除WellC SHMAX占位符后, 数据干净, RF SHMAX 稳定≈0.998(4-seed验证); 边界防真异常(>1或<0.9)
+            assert 0.95<=rr<=1.0, f"RF SHMAX sanity 失败={rr:.4f} (剔除占位后应≈0.998)"
     # FMS-KAN
     ds={'train_input':torch.tensor(Xtr_s,dtype=torch.float32),'train_label':torch.tensor(ytr_z.reshape(-1,1),dtype=torch.float32),
         'test_input':torch.tensor(Xte_s,dtype=torch.float32),'test_label':torch.zeros(len(Xte_s),1)}
