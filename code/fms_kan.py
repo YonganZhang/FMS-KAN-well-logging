@@ -25,7 +25,7 @@ def std_kan(Xtr,ytr,Xte,grid=10,steps=200,width=[12,10,6,1]):
     m=KAN(width=width,grid=grid,k=3,seed=0,device='cpu'); m.fit(ds,opt="Adam",steps=steps,lr=0.01,lamb=1e-3)
     with torch.no_grad(): return m(ds['test_input']).numpy().ravel()
 
-def fms_kan(Xtr,ytr,Xte,grids=[5,10,20],steps=120,width=[12,10,6,1]):
+def fms_kan(Xtr,ytr,Xte,grids=[5,10,15],steps=120,width=[12,10,6,1]):
     ds={'train_input':torch.tensor(Xtr,dtype=torch.float32),'train_label':torch.tensor(ytr.reshape(-1,1),dtype=torch.float32),
         'test_input':torch.tensor(Xte,dtype=torch.float32),'test_label':torch.zeros(len(Xte),1)}
     m=KAN(width=width,grid=grids[0],k=3,seed=0,device='cpu'); m.fit(ds,opt="Adam",steps=steps,lr=0.01,lamb=1e-3)

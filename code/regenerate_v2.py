@@ -98,7 +98,7 @@ def gen_heatmap():
     for i in range(len(TARGETS)):
         for j in range(len(WELLS)):
             v=raw[i,j]
-            lab=f'{v:+.3f}' if abs(v)<1 else ('≫0' if v>0 else '≪0')
+            lab=f'{v:+.3f}' if abs(v)<1 else ('>>0.1' if v>0 else '<<0')
             ax.text(j,i,lab,ha='center',va='center',fontsize=10,fontweight='bold',
                     color="white" if data[i,j]>0.06 else "#1F2937")
     fig.colorbar(im,ax=ax,shrink=0.85,label='$\\Delta R^2$ (FMS-KAN − Std. KAN), clipped to [0,0.1]')
