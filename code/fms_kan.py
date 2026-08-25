@@ -1,8 +1,8 @@
 """
-FMS-KAN 多尺度 (grid 5->10->20 多分辨率细化) vs 标准KAN — 同一 pooled split(可比)
+FMS-KAN 多尺度 (grid 5->10->15 逐级细化 refinement) vs 标准KAN — 同一 pooled split(可比)
 =================================================================================
 用 pykan 官方 grid refinement 实现多分辨率(粗->中->细),对应论文多尺度B-spline思想。
-诚实标注: 用 grid extension 实现多尺度,非并行softmax融合(可后续升级)。
+诚实标注: 依次 5->10->15 grid refinement 实现多尺度,非并行softmax融合。
 """
 import os, warnings, numpy as np, pandas as pd
 from pathlib import Path

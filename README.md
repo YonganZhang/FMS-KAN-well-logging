@@ -17,15 +17,15 @@
 
 ```mermaid
 flowchart LR
-    A["12 wireline log curves<br/>AC · DTC · DTS · DEN · GR · CNL<br/>LLD · LLS · K · TH · U · DEVI"] --> B["XGBoost–SHAP<br/>feature importance"]
-    B -->|"per-edge grid budget"| C
+    A["12 wireline log curves<br/>AC · DTC · DTS · DEN · GR · CNL<br/>LLD · LLS · K · TH · U · DEVI"] --> B["Random Forest<br/>feature importance"]
+    B -->|"guides variable selection<br/>& interpretation"| C
     A --> C
 
     subgraph C ["FMS-KAN edge (multi-scale B-spline)"]
         direction TB
         C1["coarse grid G=5<br/>formation trends"]
         C2["medium grid G=10<br/>reservoir variation"]
-        C3["fine grid G=20<br/>thin-bed anomalies"]
+        C3["fine grid G=15<br/>thin-bed anomalies<br/>(sequential refinement)"]
     end
 
     C --> D["Predictions<br/>SHMAX · TOC · PERM"]
@@ -35,8 +35,8 @@ flowchart LR
 
 Two design choices separate FMS-KAN from a standard KAN:
 
-1. **Multi-scale B-spline adaptation** — coarse (*G*=5), medium (*G*=10), and fine (*G*=20) spline resolutions are combined on every edge, so one model captures formation-level trends, reservoir-level variation, and thin-bed anomalies at once.
-2. **Feature-guided grid allocation** — XGBoost–SHAP importances set the grid budget per input edge, concentrating network capacity on the physically dominant curves.
+1. **Multi-scale B-spline adaptation** — every edge is progressively refined coarse→medium→fine (*G* = 5 → 10 → 15) via pykan grid refinement, so one model captures formation-level trends, reservoir-level variation, and thin-bed anomalies in a single coarse-to-fine schedule. This is **sequential grid refinement**, not a parallel softmax fusion of three branches.
+2. **Feature-importance analysis** — tree-based (Random Forest) feature importances identify the physically dominant curves per target and guide variable selection for the symbolic formulas; the ranking is reported alongside the extracted-formula variables as a cross-check.
 
 Because a KAN is a sum of learned univariate functions, the trained network can be **symbolically simplified into explicit equations** — the property this project exists to demonstrate.
 
@@ -89,7 +89,7 @@ On this pooled split FMS-KAN attains the **highest mean R² (0.985)**; it **lead
 
 ## Interpretability: A Formula You Can Read
 
-The point of FMS-KAN is that a fitted model is not a weight tensor but an **equation**. After pruning and symbolic fitting (`sympy`, invoked in `finalize_pipeline.py`), each target reduces to a compact sum of univariate terms. The SHMAX head takes the form:
+The point of FMS-KAN is that a fitted model is not a weight tensor but an **equation**. After pruning and symbolic fitting (pykan `auto_symbolic`, see `extract3.py`), each target reduces to a compact sum of univariate terms. The SHMAX head takes the form:
 
 ```
 σH,max  ≈  c0
@@ -100,7 +100,7 @@ The point of FMS-KAN is that a fitted model is not a weight tensor but an **equa
         +  …                   # remaining spline terms, pruned by SHAP budget
 ```
 
-Each `f_x(·)` is a low-order spline or elementary function whose exact coefficients are emitted by the pipeline. The trained SHMAX instance reaches **R² = 0.997** on the test split with a handful of readable terms — the property that distinguishes it from any black-box regressor. The literal, coefficient-level formulas for all three targets are produced deterministically by running the pipeline below; they are not committed as static text, so they always match the code that generated them.
+Each `f_x(·)` is a low-order spline or elementary function whose exact coefficients are emitted by `extract3.py`. **Two accuracy levels must be distinguished honestly:** the full *continuous* FMS-KAN (18 features) reaches R² = 0.997 on SHMAX, whereas its *symbolically simplified closed form* (top features, elementary library) is a deliberately compact approximation that trades accuracy for readability — R² ≈ **0.84** (SHMAX) and ≈ **0.83** (TOC). PERM does **not** admit a compact closed form under the current library (symbolic R² < 0) and is therefore kept as the numerical KAN model, not reported as a formula. The formulas are produced deterministically by `extract3.py` and are not committed as static text, so they always match the code that generated them.
 
 ---
 
@@ -114,10 +114,12 @@ FMS-KAN-well-logging/
 ├── requirements.txt
 ├── .gitignore
 ├── code/
-│   ├── build_dataset.py        # raw well logs → cleaned, analysis-ready tables (operates on restricted raw logs)
+│   ├── prepare_clean.py        # bridge: data/Well*.csv → code/clean/*.csv (RUN THIS FIRST)
+│   ├── build_dataset.py        # raw well logs → cleaned tables (restricted raw logs; NOT runnable from public subset)
 │   ├── train_pooled.py         # pooled 70/15/15 split, seven-model comparison table
-│   ├── fms_kan.py              # FMS-KAN multi-scale (G=5→10→20) vs. standard KAN
-│   ├── finalize_pipeline.py    # train final FMS-KAN, export predictions, weights & symbolic formulas
+│   ├── fms_kan.py              # FMS-KAN multi-scale (G=5→10→15 refinement) vs. standard KAN
+│   ├── finalize_pipeline.py    # train final FMS-KAN, export predictions, weights & per-well CSVs
+│   ├── extract3.py             # symbolic closed-form extraction (pykan auto_symbolic)
 │   ├── train_lowo.py           # leave-one-well-out (OOD) generalization comparison
 │   ├── optimize_scan.py        # optimizer / regularization / grid recipe scan
 │   ├── compute_perwell.py      # per-well R² for baselines (figures)
@@ -180,22 +182,28 @@ data/WellD.csv (572, 16) targets: ['SHMAX', 'TOC', 'PERM']
 
 ## Reproduction
 
-All modeling scripts consume the **analysis-ready** tables in `data/`. `build_dataset.py` documents the raw-log → clean-table step and operates on the **restricted raw logs**; it is included for transparency but is not runnable from the public subset alone, since the released `data/Well*.csv` are already its output.
+The modeling scripts read internally-named tables under `code/clean/`. The public release ships the de-identified `data/Well*.csv` instead, so **run `prepare_clean.py` first** — it bridges the released subset into the `code/clean/` layout the scripts expect. `build_dataset.py` documents the raw-log → clean-table step, operates on the **restricted raw logs**, and is **not** runnable from the public subset alone (the released `data/Well*.csv` are already its output).
 
 ```bash
 # 0. Environment (see Installation) — Python 3.10, seed fixed to 42
 source .venv/bin/activate
 
-# 1. Seven-model pooled comparison → reproduces the Key Results table
+# 1. Bridge the released subset into the clean/ layout the scripts expect
+python code/prepare_clean.py
+
+# 2. Seven-model pooled comparison → reproduces the Key Results table
 python code/train_pooled.py
 
-# 2. Train the final FMS-KAN; export predictions, weights & symbolic formulas
+# 3. Train the final FMS-KAN; export predictions, weights & per-well CSVs
 python code/finalize_pipeline.py
 
-# 3. Leave-one-well-out (OOD) generalization — the geoscience-credible test
+# 4. Extract symbolic closed-form formulas (SHMAX / TOC; PERM kept numerical)
+python code/extract3.py
+
+# 5. Leave-one-well-out (OOD) generalization — the geoscience-credible test
 python code/train_lowo.py
 
-# 4. Regenerate all paper figures
+# 6. Regenerate all paper figures
 python code/regenerate_v2.py
 ```
 
@@ -204,7 +212,7 @@ python code/regenerate_v2.py
 | Step                   | Writes                                                                                                                                        | Self-check                                                                                                                                            |
 |------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
 | `train_pooled.py`      | comparison table under `code/_run/`                                                                                                          | FMS-KAN mean R² ≈ **0.985**                                                                                                                          |
-| `finalize_pipeline.py` | `code/models/<TARGET>_fmskan.pt`, `code/data_desensitized_v2/<Well>/<TARGET>/data.csv`, `final_error_table.csv`, `r2_per_well.json`, printed formulas | `r2_per_well.json` mean ≈ 0.985; a **built-in Random-Forest sanity assertion** (SHMAX RF R² ≈ 0.998) aborts the run if the split silently regresses |
+| `finalize_pipeline.py` | `code/models/<TARGET>_fmskan.pt`, `code/data_desensitized_v2/<Well>/<TARGET>/data.csv`, `final_error_table.csv`, `r2_per_well.json` | pooled test R² mean ≈ 0.985; a **built-in Random-Forest sanity assertion** (SHMAX RF R² ≈ 0.998) aborts the run if the split silently regresses. **Caveat:** the per-well values in `r2_per_well.json` are computed over each well's *full* valid samples (train+val+test), i.e. a per-well reconstruction, not a per-well held-out test score |
 | `train_lowo.py`        | per-fold LOWO R² table + detail CSV                                                                                                          | per-well R², reported honestly (expect lower than pooled)                                                                                            |
 | `regenerate_v2.py`     | figures (predicted-vs-true panels, per-well heatmaps)                                                                                        | one `.png` per target                                                                                                                                |
 
