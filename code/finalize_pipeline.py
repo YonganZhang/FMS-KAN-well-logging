@@ -26,7 +26,7 @@ OUT_PRED.mkdir(exist_ok=True); OUT_MODEL.mkdir(exist_ok=True)
 WELLS=['ZXX2','ZXX3','ZXX7','ZXX6']                 # 验证过的顺序(RF SHMAX=0.9337)
 WELLMAP={'ZXX2':'WellA','ZXX3':'WellB','ZXX7':'WellC','ZXX6':'WellD'}
 BASE=['AC','DTC','DTS','DEN','GR','CNL','LLD','LLS','K','TH','U','DEVI']
-PHYS=['Vp','Vs','VpVs','AI','SI','Gpx']; FEATS=BASE+PHYS
+PHYS=[]; FEATS=BASE+PHYS   # 12原始测井特征: 派生特征几乎不涨精度却破坏符号化, 故移除, 使精度模型=可解释公式模型
 TARGETS=['SHMAX','TOC','PERM']; LOGT={'PERM'}       # 需 log 变换的目标
 WIDTH=[len(FEATS),10,4,1]
 
@@ -76,6 +76,10 @@ for T in TARGETS:
     m=train_fmskan(ds)
     with torch.no_grad(): pk=inv(m(ds['test_input']).numpy().ravel())
     err_rows.append((T,'FMS-KAN',r2(back(yte),back(pk)),mae(back(yte),back(pk))))
+    # 配对消融基线: 标准KAN(单尺度G=15), 同[18/12,10,4,1]/LBFGS/总预算100步, 唯一差别=单尺度vs多尺度refinement
+    ms=KAN(width=WIDTH,grid=15,k=3,seed=0,device='cpu'); ms.fit(ds,opt="LBFGS",steps=40,lamb=1e-4); ms.fit(ds,opt="LBFGS",steps=60,lamb=1e-4)
+    with torch.no_grad(): pks=inv(ms(ds['test_input']).numpy().ravel())
+    err_rows.append((T,'StdKAN',r2(back(yte),back(pks)),mae(back(yte),back(pks))))
     torch.save({'state_dict':m.state_dict(),'width':WIDTH,'grid':15,'k':3,'feats':FEATS,'log':T in LOGT,
                 'x_mean':xs.mean_.tolist(),'x_std':xs.scale_.tolist(),'y_mean':float(ys.mean_[0]),'y_std':float(ys.scale_[0])},
                OUT_MODEL/f"{T}_fmskan.pt")
