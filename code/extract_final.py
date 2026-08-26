@@ -14,6 +14,28 @@ import torch
 from kan import KAN
 from kan.utils import ex_round
 
+# ---- 稳健性补丁: pykan 的 spline.curve2coef 在 torch.linalg.lstsq 间歇性数值失败时,
+# except 分支只 print 不给 coef 赋值就 `return coef` -> UnboundLocalError; 失败与否随
+# 运行波动, 是符号提取【非确定性崩溃】的根源。改为始终走确定性正则化正规方程求解,
+# 使公式提取永不崩溃且逐次可复现(数值上等价于原 least-squares, lamb=1e-8)。
+import kan.spline as _sp, kan.KANLayer as _kl, kan.MultKAN as _mk
+from kan.spline import B_batch as _B_batch
+def _curve2coef_stable(x_eval, y_eval, grid, k):
+    in_dim = x_eval.shape[1]; out_dim = y_eval.shape[2]; batch = x_eval.shape[0]
+    n_coef = grid.shape[1] - k - 1
+    mat = _B_batch(x_eval, grid, k).permute(1, 0, 2)[:, None, :, :].expand(in_dim, out_dim, batch, n_coef)
+    y = y_eval.permute(1, 2, 0).unsqueeze(dim=3)
+    XtX = torch.einsum('ijmn,ijnp->ijmp', mat.permute(0, 1, 3, 2), mat)
+    Xty = torch.einsum('ijmn,ijnp->ijmp', mat.permute(0, 1, 3, 2), y)
+    n = XtX.shape[2]
+    eye = torch.eye(n, device=mat.device)[None, None].expand(XtX.shape[0], XtX.shape[1], n, n)
+    return torch.linalg.solve(XtX + 1e-8 * eye, Xty)[:, :, :, 0]
+for _m in (_sp, _kl, _mk):
+    _m.curve2coef = _curve2coef_stable
+torch.manual_seed(0); torch.set_num_threads(1)  # 单线程固定浮点归约顺序, 尽量逐次可复现
+# 注: TOC 符号化稳定(R²≈0.837, 主导系数逐次一致); SHMAX/PERM 的紧凑闭式在本函数库下
+# 拟合不稳定(SHMAX 偶发退化为高阶冗长项、PERM 符号R²<0), 脚本对其如实降级、保留数值模型。
+
 SB = Path(__file__).resolve().parent
 (SB / "_run").mkdir(exist_ok=True); os.chdir(SB / "_run")
 D = SB / "clean"; WELLS = ['ZXX2', 'ZXX3', 'ZXX7', 'ZXX6']

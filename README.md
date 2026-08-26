@@ -89,20 +89,20 @@ On this pooled split FMS-KAN attains the **highest mean R² (0.981)**; it **lead
 
 ## Interpretability: A Formula You Can Read
 
-The point of FMS-KAN is that a fitted model is not a weight tensor but an **equation**. The closed-form formulas are extracted **from the same FMS-KAN that produces the accuracy numbers above** — the model is pruned and symbolically fitted in place (pykan `auto_symbolic`, see `extract_final.py`), not re-fitted as a separate small network. Each target reduces to a compact sum of univariate terms. The SHMAX head takes the form:
+The point of FMS-KAN is that a fitted model is not a weight tensor but an **equation**. The closed-form formula is extracted **from the same FMS-KAN that produces the accuracy numbers above** — the model is pruned and symbolically fitted in place (pykan `auto_symbolic`, see `extract_final.py`), not re-fitted as a separate small network. The TOC head reduces to a compact sum of univariate terms:
 
 ```
-σH,max  ≈  c0
-        +  f_AC(AC)            # sonic (compressional slowness) — dominant term
-        +  f_DTC(DTC)          # compressional transit time
-        +  f_DTS(DTS)          # shear slowness
-        +  f_GR(GR)            # lithology / clay content
-        +  f_U(U)              # uranium
-        +  f_DEVI(DEVI)        # borehole deviation
-        +  …                   # remaining spline terms, pruned by magnitude
+TOC  ≈  c0
+     +  f_U(U)              # uranium — dominant term
+     -  f_DEN(DEN)          # bulk density
+     +  f_DTC(DTC)          # compressional transit time
+     -  f_CNL(CNL)          # neutron porosity
+     +  …                   # remaining low-magnitude linear terms
 ```
 
-Each `f_x(·)` is a low-order spline or elementary function whose exact coefficients are emitted by `extract_final.py`. **Two accuracy levels must be distinguished honestly:** the full *continuous* FMS-KAN (12 original wireline features) reaches R² ≈ 0.996 on SHMAX, whereas its *symbolically simplified closed form* (elementary library `x, x², x³, tanh`) is a deliberately compact approximation that trades accuracy for readability — R² ≈ **0.857** (SHMAX, 11 terms) and ≈ **0.837** (TOC, 13 terms). PERM does **not** admit a compact closed form under the current library (symbolic R² < 0) and is therefore kept as the numerical KAN model, not reported as a formula. The formulas are produced deterministically by `extract_final.py` and are not committed as static text, so they always match the code that generated them.
+Each `f_x(·)` is a low-order spline or elementary function whose exact coefficients are emitted by `extract_final.py`. **Two accuracy levels must be distinguished honestly:** the full *continuous* FMS-KAN (12 original wireline features) reaches R² ≈ 0.973 on TOC, whereas its *symbolically simplified closed form* (elementary library `x, x², x³, tanh`) is a deliberately compact approximation that trades accuracy for readability — the **TOC** head reduces to a stable, reproducible 12-term linear form at R² ≈ **0.837**, whose dominant variables (U, DEN, DTC, CNL) match the Random-Forest importance ranking.
+
+**Honest boundary of the current library.** For **SHMAX** and **PERM** the *continuous* FMS-KAN is highly accurate (R² ≈ 0.996 / 0.974, see the table), but a *compact* symbolic closed form is **not stably extractable** under the elementary library: SHMAX tends to collapse into a long high-order interaction expression and PERM's symbolic fit gives R² < 0. pykan's symbolic fitting is also stochastic run-to-run for these targets, so `extract_final.py` honestly **downgrades** them and keeps the numerical KAN model instead of forcing a formula. `extract_final.py` fixes seeds and single-threads (`set_num_threads(1)`) and patches a `curve2coef` crash in pykan for best-effort reproducibility; low-magnitude TOC coefficients may still wiggle in the last decimal. The formulas are produced by `extract_final.py` and are not committed as static text, so they always match the code that generated them.
 
 ---
 
