@@ -6,10 +6,10 @@
 [![Code License: MIT](https://img.shields.io/badge/code%20license-MIT-blue.svg)](LICENSE)
 [![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/)
 [![PyTorch 2.x](https://img.shields.io/badge/PyTorch-2.x-ee4c2c.svg)](https://pytorch.org/)
-[![Data: 50% de-identified subset](https://img.shields.io/badge/data-50%25%20de--identified%20subset-lightgrey.svg)](#data--ethics)
+[![Data: full de-identified dataset](https://img.shields.io/badge/data-full%20de--identified%20dataset-lightgrey.svg)](#data--ethics)
 [![Reproducible pipeline](https://img.shields.io/badge/reproducible-pipeline-brightgreen.svg)](#reproduction)
 
-> **What this repo is.** The code and a de-identified 50% data subset for the FMS-KAN paper (under review). It reproduces the modeling pipeline end-to-end and the study's qualitative results. This is a research snapshot, not a production library — see [Project Status](#project-status).
+> **What this repo is.** The code and the full de-identified four-well dataset for the FMS-KAN paper (under review). It reproduces the modeling pipeline end-to-end and the study's qualitative results. This is a research snapshot, not a production library — see [Project Status](#project-status).
 
 ---
 
@@ -75,15 +75,15 @@ On this pooled split FMS-KAN attains the **highest mean R² (0.981)**; it **lead
 
 > **How to read these numbers.** They are point estimates from **one** pooled random split. Well-log samples are spatially and depth-correlated, so a pooled split can be optimistic — treat these values as an *upper-bound* generalization estimate, **not** a leave-one-well-out (LOWO) claim. They carry **no confidence intervals** (single seed, single split). For the geoscience-credible out-of-distribution test, use `train_lowo.py`, which withholds an entire well at a time. Per-target RMSE/MAE in physical units (MPa, wt%, mD) and per-well breakdowns are written to `final_error_table.csv` and `r2_per_well.json` by the pipeline rather than hand-copied here.
 
-**Released-subset sample counts** (rows per well in `data/`; target columns contain depth-dependent gaps):
+**Released dataset sample counts** (rows per well in `data/`; target columns contain depth-dependent gaps):
 
 | Well      |    Rows |
 |-----------|--------:|
-| Well A    |   1,346 |
-| Well B    |   2,106 |
-| Well C    |   1,788 |
-| Well D    |     572 |
-| **Total** | **5,812** |
+| Well A    |   2,691 |
+| Well B    |   4,211 |
+| Well C    |   3,575 |
+| Well D    |   1,144 |
+| **Total** | **11,621** |
 
 ---
 
@@ -175,17 +175,17 @@ PY
 Expected output — four wells, 16 columns each (DEPTH + 12 features + 3 targets):
 
 ```
-data/WellA.csv (1346, 16) targets: ['SHMAX', 'TOC', 'PERM']
-data/WellB.csv (2106, 16) targets: ['SHMAX', 'TOC', 'PERM']
-data/WellC.csv (1788, 16) targets: ['SHMAX', 'TOC', 'PERM']
-data/WellD.csv (572, 16) targets: ['SHMAX', 'TOC', 'PERM']
+data/WellA.csv (2691, 16) targets: ['SHMAX', 'TOC', 'PERM']
+data/WellB.csv (4211, 16) targets: ['SHMAX', 'TOC', 'PERM']
+data/WellC.csv (3575, 16) targets: ['SHMAX', 'TOC', 'PERM']
+data/WellD.csv (1144, 16) targets: ['SHMAX', 'TOC', 'PERM']
 ```
 
 ---
 
 ## Reproduction
 
-The modeling scripts read internally-named tables under `code/clean/`. The public release ships the de-identified `data/Well*.csv` instead, so **run `prepare_clean.py` first** — it bridges the released subset into the `code/clean/` layout the scripts expect. `build_dataset.py` documents the raw-log → clean-table step, operates on the **restricted raw logs**, and is **not** runnable from the public subset alone (the released `data/Well*.csv` are already its output).
+The modeling scripts read internally-named tables under `code/clean/`. The public release ships the de-identified `data/Well*.csv` instead, so **run `prepare_clean.py` first** — it bridges the released tables into the `code/clean/` layout the scripts expect. `build_dataset.py` documents the raw-log → clean-table step, operates on the **restricted raw LAS logs**, and is **not** runnable from the released tables alone (the released `data/Well*.csv` are already its output).
 
 ```bash
 # 0. Environment (see Installation) — Python 3.10, seed fixed to 42
@@ -228,12 +228,12 @@ Runtime is on the order of minutes on CPU. Intermediate directories (`_run/`, `m
 
 ## Data & Ethics
 
-**Released data (this repository).** `data/WellA–D.csv` is a **de-identified, randomly sampled 50% subset** of a four-well wireline-log dataset, released with the **data provider's authorization** for the sole purpose of reproducing this study.
+**Released data (this repository).** `data/WellA–D.csv` is the **full, de-identified** four-well wireline-log dataset (all valid depth samples), released with the **data provider's authorization** for the sole purpose of reproducing this study.
 
-- **Anonymization.** Well identities are replaced with neutral labels (Well A–D), and the row-level random 50% subsample removes the ability to reconstruct continuous proprietary intervals. Because sampling is random over depth rather than contiguous, fine-grained depth structure is *partially* disrupted: the subset is sufficient to reproduce the modeling pipeline and qualitative results and to obtain point estimates in the neighborhood of those reported, but it is **not** the exact dataset behind every published figure.
-- **Restricted full dataset.** The complete, depth-continuous logs remain confidential under the provider's restrictions and are **not** distributed here.
-- **Licensing.** The **code** is MIT-licensed (see [License](#license)). The **data** subset is **not** MIT — it is provided for research reproduction under the provider's authorization only, with **no redistribution** and no commercial use. Treat `data/` and `code/` as separately licensed.
-- **Provenance / citation.** The dataset is not assigned a public DOI. Cite this repository and the paper (see [Citation](#citation)) when using the subset.
+- **Anonymization.** Well identities are replaced with neutral labels (Well A–D) and internal well IDs are stripped. The released tables contain the full depth-continuous logs (absolute depth, 12 wireline curves, three targets) and are the exact data behind the paper's reported numbers and figures.
+- **Raw logs.** Only the cleaned, de-identified tables are distributed. The original LAS files and any provider-identifying metadata remain confidential; `build_dataset.py` documents the raw-log → clean-table step for holders of the controlled raw data.
+- **Licensing.** The **code** is MIT-licensed (see [License](#license)). The **data** is **not** MIT — it is provided for research reproduction under the provider's authorization only, with **no redistribution** and no commercial use. Treat `data/` and `code/` as separately licensed.
+- **Provenance / citation.** The dataset is not assigned a public DOI. Cite this repository and the paper (see [Citation](#citation)) when using the data.
 - **Access to the full data / provider identity.** Requests are handled case by case, subject to provider approval — contact the corresponding author (see [Contributing & Contact](#contributing--contact)).
 
 ---

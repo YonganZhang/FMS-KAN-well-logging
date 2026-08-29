@@ -2,13 +2,12 @@
 复现性桥接脚本 (reproducibility bridge)
 =======================================
 从公开脱敏数据 data/Well{A-D}.csv 还原出各训练脚本所需的 clean/{内部井名}_clean.csv,
-使公开副本无需原始 LAS 即可直接运行 train_pooled.py / finalize_pipeline.py / fms_kan.py / extract3.py。
+使公开副本无需原始 LAS 即可直接运行 train_pooled.py / finalize_pipeline.py / fms_kan.py / extract_final.py。
 
-数据说明(甲方红线):
-- data/Well{A-D}.csv 为甲方授权、逐样本随机 50% 抽取并井名脱敏的子集(仅 12 原始测井特征 + 3 目标 + DEPTH)。
-- 原始 LAS 与全量数据不公开; build_dataset.py 仅供持有受控原始数据者复现完整清洗流程使用。
-- 因此公开副本复现的是"从已发布脱敏数据出发"的可运行路径, 数值会因 50% 抽样而与论文全量结果存在差异,
-  但方法、管线与相对结论可完整复现。
+数据说明(甲方授权):
+- data/Well{A-D}.csv 为甲方授权公开、井名脱敏并去除内部井号的【全量】四井数据(12 原始测井特征 + 3 目标 + DEPTH, 深度连续)。
+- 原始 LAS 与任何可识别甲方的元数据不公开; build_dataset.py 仅供持有受控原始数据者复现完整清洗流程使用。
+- 公开副本从该全量脱敏数据出发, 可完整复现论文的数值与图件。
 
 用法:
     python code/prepare_clean.py      # 生成 code/clean/*.csv
